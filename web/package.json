@@ -24,6 +24,7 @@
     "@fontsource/fraunces": "^5.0.0",
     "@fontsource/inter": "^5.0.0",
     "clsx": "^2.1.1",
+    "events": "^3.3.0",
     "lucide-svelte": "^1.0.0",
     "luxon": "^3.5.0",
     "pouchdb-browser": "^7.3.1",
