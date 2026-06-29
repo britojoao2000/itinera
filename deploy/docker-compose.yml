@@ -29,7 +29,7 @@ services:
       - couchdb-data:/opt/couchdb/data
       # Enable single-node mode so the system DBs (_users/_replicator/_global_changes)
       # are created automatically on first start.
-      - ./couchdb/10-single-node.ini:/opt/couchdb/etc/local.d/10-single-node.ini:ro
+      - ./couchdb/10-single-node.ini:/opt/couchdb/etc/local.d/10-single-node.ini
     # IMPORTANT: no `ports:` here – CouchDB is never published to the host or the
     # internet. It is reached only through Caddy on the internal network.
     expose:
