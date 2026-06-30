@@ -64,6 +64,7 @@ All configuration lives in `deploy/.env` (copied from `.env.example`; **gitignor
 | `COUCHDB_DB` | no | `itinera` | App database name (FastAPI creates it + indexes). |
 | `HOST_HTTP_PORT` | no | `80` | Host port published for the app → `http://localhost:<port>` |
 | `TZ` | no | `UTC` | Container timezone (logs, scheduled exports). |
+| `DOCS_ENABLED` | no | `false` | Enable FastAPI Swagger/ReDoc at `/api/docs`. Set `true` for local development. |
 
 `COUCHDB_URL` (`http://couchdb:5984`) and `EXPORT_DIR` (`/data/exports`) are set for the FastAPI container by compose and don't need to be in `.env`.
 
@@ -142,6 +143,29 @@ Nothing is exposed to the public internet. To reach Itinera from anywhere:
    ```
    Then open `https://<host>.<tailnet>.ts.net` on any tailnet device.
 3. **Alternative** – let Caddy serve the tailnet hostname directly: run `tailscale cert <host>.<tailnet>.ts.net`, mount the cert/key into the `caddy` container, publish `443` (commented in `docker-compose.yml`), and enable the commented hostname block in the `Caddyfile`.
+
+> **No rebuild needed when changing hostname.** The PWA resolves the CouchDB sync target at runtime from `window.location.origin` (see `web/src/lib/db/pouch.ts`). Opening the app at any origin — `localhost:8090`, `192.168.1.x:8090`, or `https://<host>.ts.net` — automatically points PouchDB at the correct `/db/itinera` endpoint on that host. You never need to rebuild the frontend just because the server address changed.
+
+## Public Domain Deployment
+
+Caddy issues TLS certificates automatically via Let's Encrypt when a real hostname is used:
+
+1. Point a DNS `A` record at your server's IP (`itinera.yourdomain.com → <server IP>`).
+2. Open ports `80` and `443` in the server's firewall.
+3. In `deploy/Caddyfile`, replace `:80` with your domain:
+   ```caddyfile
+   itinera.yourdomain.com {
+       # ... rest of the block unchanged
+       header {
+           Strict-Transport-Security "max-age=31536000"
+           # ... other headers
+       }
+   }
+   ```
+4. In `deploy/docker-compose.yml`, uncomment the `443` port lines.
+5. Redeploy: `docker compose up --build -d`.
+
+Caddy will obtain and auto-renew the certificate from Let's Encrypt.
 
 ---
 

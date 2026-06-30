@@ -1,71 +1,131 @@
-# Itinera – Personal Trip Planner
+# Itinera — FastAPI Backend
 
-A self-hosted, **offline-first** trip planner. Plan trips on your phone or laptop, view and edit everything offline, and have it sync automatically when you’re back online. Runs entirely on your home server with a local database.
+The `api/` package is a **Python ≥ 3.12 / FastAPI** helper service that lives alongside CouchDB on the server. It handles tasks that the browser cannot: scheduled JSON exports, printable trip PDFs, CouchDB housekeeping, and the container health probe used by Docker Compose.
 
-> **Status:** **Design complete – ready to build** • Owner: you (single user) • Date: 2026-06-23
+> **Not a data API.** Trip data lives in CouchDB and syncs directly to the browser via PouchDB — no REST route is needed for CRUD. This service handles background utility work only.
 
-## What it does
+---
 
-- **Home dashboard** of all your trips.
-- Each trip has: **Overview • Itinerary • Checklist • Flights • Reservations • Costs & Budget**.
-- Attach booking PDFs / screenshots to flights and reservations.
-- Works **offline** (full create/edit) and **syncs** when reconnected.
+## Routes
 
-## Design north stars
+All routes are mounted under the `/api` prefix (preserved by the Caddy `handle /api/*` directive).
 
-- **Mobile-first**, but genuinely great on desktop (responsive).
-- **Local-first**: your data lives on your devices and your server – never a third party.
-- **Low maintenance**: simple to run, simple to back up.
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/health` | Liveness probe + CouchDB reachability. Always returns 200 while the service is up. |
+| `POST` | `/api/backups/run` | Trigger a JSON + attachments dump immediately. |
+| `GET` | `/api/backups` | List existing backup files in `EXPORT_DIR`. |
+| `GET` | `/api/exports/trips` | Export all trips as structured JSON. |
+| `GET` | `/api/exports/trip/{id}` | Export a single trip (with all child documents) as JSON. |
+| `GET` | `/api/pdf/trip/{id}` | Generate and return a printable PDF for a trip. |
 
-## Locked decisions (from kickoff)
+When `DOCS_ENABLED=true` (default in development), OpenAPI docs are available at:
+- Swagger UI: `/api/docs`
+- ReDoc: `/api/redoc`
+- OpenAPI JSON: `/api/openapi.json`
 
-| Topic | Decision |
-|-------|----------|
-| Users | Single user (just me) |
-| Offline | **Full offline create/edit**, auto-sync on reconnect |
-| Devices | Android (Chrome) + laptop/desktop browser |
-| Deployment | Docker on home server |
-| Data entry | Manual + file attachments (PDF/images) for v1 |
-| Frontend | Installable **PWA** (SvelteKit) – see Architecture |
-| Python | Kept via **FastAPI** for server-side "smarts" |
+---
 
-## Architecture at a glance
+## Startup Sequence
 
-- **Local-first PWA + CouchDB.** A SvelteKit PWA reads/writes a local PouchDB on each device and syncs to a CouchDB "source of truth" on the home server. A small FastAPI service handles Python smarts (backups, exports, future imports). Reached securely over Tailscale. See `[docs/02-architecture.md]`
+On startup the app:
+1. Connects to CouchDB (retries up to `COUCH_READY_RETRIES` times, waiting `COUCH_READY_BACKOFF_SECONDS` between attempts).
+2. Ensures the `COUCHDB_DB` database exists (creates it if missing).
+3. Provisions all required Mango indexes.
+4. Starts the background scheduler (if `SCHEDULER_ENABLED=true`) for periodic backups and compaction.
 
-## Decisions: all foundational ones locked
+---
 
-- **Backbone:** Stack A – PouchDB ⇄ CouchDB + FastAPI helper.
-- **Access:** LAN + VPN (Tailscale), no app login.
-- Full log in `[docs/00-decision-log.md]`
+## Environment Variables
 
-## Documentation Index
+| Variable | Default | Description |
+|---|---|---|
+| `COUCHDB_URL` | `http://couchdb:5984` | CouchDB base URL (Docker internal network). |
+| `COUCHDB_USER` | `admin` | CouchDB admin username. |
+| `COUCHDB_PASSWORD` | *(required)* | CouchDB admin password. |
+| `COUCHDB_DB` | `itinera` | Application database name. |
+| `HTTP_TIMEOUT_SECONDS` | `30.0` | HTTP client timeout for CouchDB requests. |
+| `EXPORT_DIR` | `/data/exports` | Directory where backup dumps are written. |
+| `BACKUP_INTERVAL_HOURS` | `24.0` | How often the scheduler triggers a backup. |
+| `BACKUP_CRON` | `None` | Override with a cron expression (e.g. `0 3 * * *`). Takes precedence over `BACKUP_INTERVAL_HOURS`. |
+| `BACKUP_KEEP` | `14` | Number of backup files to retain (older ones are pruned). |
+| `COMPACT_ON_BACKUP` | `true` | Run CouchDB compaction after each backup. |
+| `SCHEDULER_ENABLED` | `true` | Enable/disable the background scheduler. |
+| `DOCS_ENABLED` | `true` | Enable Swagger/ReDoc/OpenAPI at `/api/docs`, `/api/redoc`, `/api/openapi.json`. Set to `false` in production (default in `docker-compose.yml`). |
+| `CORS_ORIGINS` | *(empty)* | Comma-separated list of allowed CORS origins. Not needed in the default same-origin Caddy setup. |
+| `COUCH_READY_RETRIES` | `10` | Max attempts to wait for CouchDB to be ready on startup. |
+| `COUCH_READY_BACKOFF_SECONDS` | `2.0` | Seconds between CouchDB readiness retries. |
 
-| Doc | Purpose |
-|-----|---------|
-| `[docs/00-decision-log.md]` | Running log of every key decision + rationale |
-| `[docs/01-requirements.md]` | Functional + non-functional requirements |
-| `[docs/02-architecture.md]` | System architecture, data flow, deployment, backups |
-| `[docs/03-tech-stack.md]` | Concrete technologies + rationale |
-| `[docs/04-data-model.md]` | CouchDB document model + relationships |
-| `[docs/05-offline-and-sync.md]` | Offline + sync strategy, conflicts, attachments |
-| `[docs/06-page-home.md]` | Home / all trips screen plan |
-| `[docs/07-page-trip-overview.md]` | Trip shell (navigation) + Overview dashboard |
-| `[docs/08-page-itinerary.md]` | Day-by-day itinerary (timeline) |
-| `[docs/09-page-checklist.md]` | Checklist (groups, templates, daily to-dos) |
-| `[docs/10-page-flights.md]` | Flight bookings (multi-leg, airports, timezones) |
-| `[docs/11-page-reservations.md]` | Reservations (tailored types, timeline) |
-| `[docs/12-page-costs-budget.md]` | Costs per day + budget tracking |
-| `[docs/13-ui-ux.md]` | UI/UX design system (color, warm, forest-green) |
-| `[docs/14-roadmap.md]` | Build phases & milestones |
+---
 
-## Diagram conventions (LLM-first)
+## Local Development
 
-All diagrams are written to be **unambiguously machine-readable** – no ASCII-art mockups:
+**Requirements:** Python ≥ 3.12, a running CouchDB instance (e.g. from `docker compose up couchdb`).
 
-- **Mermaid** for everything: `flowchart` for screen layouts and process flows, `sequenceDiagram` for sync, `erDiagram` for the data model.
-- **Screen layouts** are modeled as a region tree: a `subgraph` = a screen area; nodes = components; solid edges (`-->`) denote **vertical stacking order** ("appears below").
-- **Tables and nested lists** carry exact field/content detail next to each diagram.
-- Labels are quoted plain text so they parse cleanly.
+```bash
+cd api
 
-This folder is a **planning workspace**. We design first, doc by doc, pausing to confirm important decisions before locking them in.
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate    # Windows: .venv\Scripts\activate
+
+# Install with dev extras
+pip install -e ".[dev]"
+
+# Copy and configure the environment
+cp .env.example .env
+# Edit COUCHDB_PASSWORD (and optionally COUCHDB_URL if CouchDB runs elsewhere)
+
+# Start the development server (auto-reload)
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Open `http://localhost:8000/api/docs` to explore the interactive Swagger UI.
+
+---
+
+## Running Tests
+
+```bash
+cd api
+source .venv/bin/activate
+pytest
+```
+
+Tests use an in-memory mock CouchDB client; no live CouchDB is required.
+
+---
+
+## Docker Build
+
+The service is built by `deploy/api.Dockerfile` (build context: repo root `itinera/`). The `pyproject.toml` uses `hatchling` as the build backend and is `pip install`-able as a standard Python package.
+
+```bash
+# From the repo root
+docker compose -f deploy/docker-compose.yml build fastapi
+```
+
+The image listens on port `8000` (internal only; reached through Caddy at `/api/*`).
+
+---
+
+## Package Structure
+
+```
+api/
+├── pyproject.toml          # Package metadata + deps (hatchling build backend)
+├── .env.example            # Environment variable template
+└── app/
+    ├── main.py             # App factory + lifespan + router registration
+    ├── config.py           # Pydantic Settings (reads env vars)
+    ├── couch.py            # Async CouchDB client + index provisioning
+    ├── deps.py             # FastAPI dependency injection helpers
+    ├── errors.py           # HTTP error handlers
+    ├── models.py           # Pydantic request/response schemas
+    ├── scheduler.py        # APScheduler setup for periodic backup + compaction
+    ├── util.py             # Shared utilities (timestamps, etc.)
+    ├── routers/            # Route modules: health, backups, exports, pdf
+    ├── services/           # Business logic: backup runner, PDF renderer
+    ├── importers/          # Data import helpers
+    └── templates/          # Jinja2 templates for PDF generation
+```
