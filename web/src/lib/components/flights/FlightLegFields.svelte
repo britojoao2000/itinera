@@ -64,7 +64,7 @@
     </legend>
 
     <div class="mt-2 flex flex-col gap-3">
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Airline" for={fid('airline')}>
                 <Input
                     id={fid('airline')}
@@ -83,42 +83,53 @@
             </Field>
         </div>
 
-        <Field label="From" for={fid('from')}>
-            <AirportInput
-                id={fid('from')}
-                value={leg.from}
-                placeholder="Origin – city or code"
-                onchange={(v) => (leg.from = v)}
-            />
-        </Field>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="From" for={fid('from')}>
+                <AirportInput
+                    id={fid('from')}
+                    value={leg.from}
+                    placeholder="Origin – city or code"
+                    onchange={(v) => (leg.from = v)}
+                />
+            </Field>
+            <Field label="To" for={fid('to')}>
+                <AirportInput
+                    id={fid('to')}
+                    value={leg.to}
+                    placeholder="Destination – city or code"
+                    onchange={(v) => (leg.to = v)}
+                />
+            </Field>
+        </div>
 
-        <Field
-            label="Departs"
-            for={fid('dep')}
-            hint={leg.from?.tz ? `Local time · ${leg.from.tz}` : 'Local time at the origin'}
-        >
-            <Input
-                id={fid('dep')}
-                type="datetime-local"
-                value={leg.departLocal}
-                oninput={(e) => (leg.departLocal = e.currentTarget.value)}
-            />
-        </Field>
-
-        <Field
-            label="Arrives"
-            for={fid('arr')}
-            error={error}
-            hint={leg.to?.tz ? `Local time · ${leg.to.tz}` : 'Local time at the destination'}
-        >
-            <Input
-                id={fid('arr')}
-                type="datetime-local"
-                value={leg.arriveLocal}
-                invalid={!!error}
-                oninput={(e) => (leg.arriveLocal = e.currentTarget.value)}
-            />
-        </Field>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field
+                label="Departs"
+                for={fid('dep')}
+                hint={leg.from?.tz ? `Local time · ${leg.from.tz}` : 'Local time at the origin'}
+            >
+                <Input
+                    id={fid('dep')}
+                    type="datetime-local"
+                    value={leg.departLocal}
+                    oninput={(e) => (leg.departLocal = e.currentTarget.value)}
+                />
+            </Field>
+            <Field
+                label="Arrives"
+                for={fid('arr')}
+                error={error}
+                hint={leg.to?.tz ? `Local time · ${leg.to.tz}` : 'Local time at the destination'}
+            >
+                <Input
+                    id={fid('arr')}
+                    type="datetime-local"
+                    value={leg.arriveLocal}
+                    invalid={!!error}
+                    oninput={(e) => (leg.arriveLocal = e.currentTarget.value)}
+                />
+            </Field>
+        </div>
 
         {#if durationText || arrivalDayOffset > 0}
             <p class="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-muted">

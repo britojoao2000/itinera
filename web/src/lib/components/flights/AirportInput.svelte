@@ -40,11 +40,11 @@
 
     const showSearch = $derived(searching || !value);
 
-    const chipLabel = $derived(() => {
-        if (!value) return '';
-        const code = value.code ? `${value.code} ` : '';
-        return `${code}${value.city ?? value.name ?? 'Airport'}`;
-    });
+    const chipLabel = $derived(
+        value
+            ? `${value.code ? `${value.code} ` : ''}${value.city ?? value.name ?? 'Airport'}`
+            : ''
+    );
 
     function runSearch(q: string) {
         if (debounce) clearTimeout(debounce);
